@@ -14,7 +14,7 @@
  * Constants
  */
 #define TABSZ 1873	/* default hash table elements */
-#define MINTABSZ 3	/* Smallest allowable has table size */
+#define MINTABSZ 3	/* Smallest allowable hash table size */
 
 /*
  * hash table chains are of the following type
@@ -87,7 +87,13 @@ main(int argc, char *argv[])
 node *
 dns_lookup(node *front, char *DNSname) 
 {
-// your code here
+	node* currentNode = front;
+	while(currentNode){
+		if(strcmp(currentNode->DNSname,DNSname) == 0)
+			return currentNode;
+		currentNode = currentNode->next;
+	}
+	return NULL;
 }
 
 /*
@@ -100,9 +106,14 @@ dns_lookup(node *front, char *DNSname)
  * returns: a pointer to the new head of the chain NULL if the insert fails 
  */
 node *
-add_front(node *front, char *DNSname)
-{
-// your code here
+add_front(node *front, char *DNSname){
+	node* nodeToAdd = (node*)malloc(sizeof(node));
+	nodeToAdd->DNSname = strdup(DNSname);
+	nodeToAdd->next = front;
+	if(nodeToAdd == NULL)
+		return NULL;
+
+	return nodeToAdd;
 }
 
 /*
@@ -140,11 +151,27 @@ hash(char *str)
 void
 dostats(node **htable, unsigned long tabsz)
 {
-// your code here put your variables into the fprintf below
-	// fprintf(stderr, "Table size: %lu\n",
-	// fprintf(stderr, "Total entries: %lu\n",
-	// fprintf(stderr, "Longest chain: %lu\n",
-	// fprintf(stderr, "Shortest chain: %lu\n",
+	unsigned long nodeCount = 0, longestChain = 0, shortestChain = 999999, count = 0;
+	unsigned long i;
+	for(i = 0; i < tabsz; ++i){
+		if(htable[i] == NULL)
+			continue;
+		node* currentNode = htable[i];
+		count = 0;
+		while(currentNode != NULL){
+			count++;
+			nodeCount +=1;
+			currentNode = currentNode->next;
+		}
+		if(count < shortestChain)
+			shortestChain = count;
+		if(count > longestChain)
+			longestChain = count;
+	}
+	 fprintf(stderr, "Table size: %lu\n", tabsz);
+	 fprintf(stderr, "Total entries: %lu\n", nodeCount);
+	 fprintf(stderr, "Longest chain: %lu\n", longestChain);
+	 fprintf(stderr, "Shortest chain: %lu\n", shortestChain);
 }
 
 /*
@@ -220,7 +247,41 @@ parseopts(int argc, char *argv[], char **filename, unsigned long *tabsz, int *st
 int
 loadtable(node **htable, unsigned long tabsz, char *blockname)
 {
-// your code here
+	FILE* fp; 
+	node* tmp;
+	fp = fopen(blockname, "r");
+	if(fp == NULL){
+		fprintf(stderr, "File %s could not be opened", blockname);
+		return 1;
+	}
+	char ch = '\n';
+	char* line = NULL;
+	size_t len = 0;
+	char* trailingChar;
+	unsigned long hashcode;
+	ssize_t lineLength;
+	while((lineLength = getline(&line, &len, fp)) > 0){
+		if((line[0] == '\n') || line[0] == '#')
+			continue;
+		trailingChar = strchr(line, ch);
+		if(trailingChar != NULL)
+			*trailingChar = '\0';
+		hashcode = hash(line) % tabsz;
+		if(dns_lookup(htable[hashcode],line)){
+			fprintf(stderr, "Loadtable Duplicate entry: %s\n", line);
+			continue;
+		}
+		else{
+			tmp = add_front(htable[hashcode], line);
+			if(tmp)
+				htable[hashcode] = tmp;
+			else
+				return 1;
+		}
+	}	
+	free(line);
+	fclose(fp);
+	return 0;
 }
 
 /*
@@ -237,9 +298,30 @@ loadtable(node **htable, unsigned long tabsz, char *blockname)
 void
 querytable(node **htable, unsigned long tabsz)
 {
-// your code here
+	char* line = NULL;
+	char ch = '\n'; 
+	char* trailingChar;
+	size_t len = 0;
+	unsigned long hashcode;
+	ssize_t lineLength;
+	node* data;
+	while((lineLength = getline(&line, &len, stdin)) != -1){
+		// add line[0]
+		trailingChar = strchr(line, ch);
+		if(trailingChar != NULL)
+			*trailingChar = '\0';
+		hashcode = hash(line) % tabsz;
+		if(htable[hashcode] != NULL){
+			data = dns_lookup(htable[hashcode], line);
+			if(data != NULL){
+				printf("%s [blocked]\n", line);
+				continue;
+			}
+		}
+				printf("%s [not blocked]\n", line);
+	}
+	free(line);
 }
-
 /*
  * deleteTable
  *
@@ -254,7 +336,17 @@ querytable(node **htable, unsigned long tabsz)
 void
 deleteTable(node **htable, unsigned long tabsz)
 {
-// your code here
+	unsigned int i;
+	for(i = 0; i < tabsz; ++i){
+		node* currentNode = htable[i];
+		while(currentNode != NULL){
+			node* temp = currentNode;
+			currentNode = currentNode->next;
+			free(temp->DNSname);
+			free(temp);
+		}
+	}
+	free(htable);
 }
 
 
