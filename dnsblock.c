@@ -1,5 +1,5 @@
 /*
- * Author:
+ * Author: Joshua Santillan
  * 
  */
 #include <stdio.h>
