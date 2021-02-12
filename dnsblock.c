@@ -306,7 +306,8 @@ querytable(node **htable, unsigned long tabsz)
 	ssize_t lineLength;
 	node* data;
 	while((lineLength = getline(&line, &len, stdin)) != -1){
-		// add line[0]
+		if((line[0] == '\n') || line[0] == '#')
+			continue;
 		trailingChar = strchr(line, ch);
 		if(trailingChar != NULL)
 			*trailingChar = '\0';
